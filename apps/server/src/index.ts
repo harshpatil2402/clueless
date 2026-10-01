@@ -12,7 +12,11 @@ const webDist = fileURLToPath(new URL('../../web/dist', import.meta.url));
 const app = buildApp({ dbPath, logger: true, staticDir: existsSync(webDist) ? webDist : undefined });
 const port = Number(process.env.PORT ?? 3001);
 
-app.listen({ port, host: process.env.HOST ?? '127.0.0.1' }).catch((error) => {
+// Hosting platforms inject PORT and need the server reachable from outside the container;
+// local development keeps to loopback.
+const host = process.env.HOST ?? (process.env.PORT ? '0.0.0.0' : '127.0.0.1');
+
+app.listen({ port, host }).catch((error) => {
   app.log.error(error);
   process.exit(1);
 });
