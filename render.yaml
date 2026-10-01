@@ -1,0 +1,21 @@
+# Render blueprint: one web service serving the API and the built web app,
+# with a persistent disk holding the SQLite database.
+services:
+  - type: web
+    name: clueless
+    runtime: node
+    plan: starter # persistent disks are not available on the free plan
+    buildCommand: npm ci --include=dev && npm run build
+    startCommand: npm run start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_VERSION
+        value: "24" # node:sqlite needs a recent Node
+      - key: HOST
+        value: 0.0.0.0
+      - key: DB_PATH
+        value: /var/data/crossword.db
+    disk:
+      name: clueless-data
+      mountPath: /var/data
+      sizeGB: 1
