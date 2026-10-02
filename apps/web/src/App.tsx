@@ -2,12 +2,12 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { DIFFICULTIES, type PlayerSession } from '@crossword/shared';
 import { api } from './api';
 import { PocketCartoon } from './components/Cartoons';
-import { Guide } from './components/Guide';
+import { GoogleButton } from './components/GoogleButton';
 import { Masthead } from './components/Masthead';
 import { Game, type GameTarget } from './pages/Game';
 import { Home } from './pages/Home';
 import { Leaderboard } from './pages/Leaderboard';
-import { loadPlayer, savePlayer } from './storage';
+import { clearPlayer, loadPlayer, savePlayer } from './storage';
 
 type Route = { page: 'home' } | { page: 'leaderboard' } | { page: 'game'; target: GameTarget };
 
@@ -32,48 +32,60 @@ function useRoute(): Route {
   return parseRoute(hash);
 }
 
-function Welcome({ onJoined }: { onJoined: (player: PlayerSession) => void }) {
+function Welcome({ onSession }: { onSession: (player: PlayerSession) => void }) {
   const [nickname, setNickname] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const join = async (event: FormEvent) => {
-    event.preventDefault();
+  const start = async (request: Promise<PlayerSession>) => {
     setBusy(true);
     setError(null);
     try {
-      const player = await api.createPlayer(nickname);
-      savePlayer(player);
-      onJoined(player);
+      onSession(await request);
     } catch (reason) {
       setError((reason as Error).message);
       setBusy(false);
     }
   };
 
+  const joinAsGuest = (event: FormEvent) => {
+    event.preventDefault();
+    void start(api.createPlayer(nickname));
+  };
+
   return (
     <main className="page">
       <Masthead left="Welcome" />
-      <h1 className="headline">Extra! Extra! Brains Wanted</h1>
-      <p className="standfirst">Quiz knowledge in crossword form. Pick a nickname for the leaderboard and step up.</p>
-      <form className="welcome-form" onSubmit={join}>
-        <input
-          autoFocus
-          value={nickname}
-          maxLength={20}
-          placeholder="Nickname"
-          aria-label="Nickname"
-          onChange={(event) => setNickname(event.target.value)}
-        />
-        <button type="submit" className="button primary" disabled={busy || nickname.trim() === ''}>
-          Start
-        </button>
-      </form>
-      {error && <p className="error">{error}</p>}
       <div className="welcome-cartoon">
         <PocketCartoon />
       </div>
-      <Guide />
+      <h1 className="headline">Extra! Extra! Brains Wanted</h1>
+      <p className="standfirst">Quiz knowledge in crossword form. Sign in to keep your scores, or just pick a nickname.</p>
+
+      <div className="join">
+        <h2 className="join-title">Collect Your Press Pass</h2>
+        <GoogleButton
+          prominent
+          label="signin_with"
+          onCredential={(credential) => void start(api.googleSignIn(credential))}
+        />
+        <p className="join-or">or play as a guest</p>
+        <form className="welcome-form" onSubmit={joinAsGuest}>
+          <input
+            value={nickname}
+            maxLength={20}
+            placeholder="Nickname"
+            aria-label="Nickname"
+            onChange={(event) => setNickname(event.target.value)}
+          />
+          <button type="submit" className="button primary" disabled={busy || nickname.trim() === ''}>
+            Start
+          </button>
+        </form>
+        <p className="muted small">Guest scores stay in this browser only. You can link Google later.</p>
+        {error && <p className="error">{error}</p>}
+      </div>
+
     </main>
   );
 }
@@ -82,8 +94,18 @@ export function App() {
   const [player, setPlayer] = useState(loadPlayer);
   const route = useRoute();
 
-  if (!player) return <Welcome onJoined={setPlayer} />;
+  const onSession = (session: PlayerSession) => {
+    savePlayer(session);
+    setPlayer(session);
+  };
+  const signOut = () => {
+    clearPlayer();
+    setPlayer(null);
+    location.hash = '#/';
+  };
+
+  if (!player) return <Welcome onSession={onSession} />;
   if (route.page === 'leaderboard') return <Leaderboard />;
   if (route.page === 'game') return <Game target={route.target} />;
-  return <Home player={player} />;
+  return <Home player={player} onSession={onSession} onSignOut={signOut} />;
 }

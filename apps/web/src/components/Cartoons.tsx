@@ -149,3 +149,72 @@ export function PocketCartoon() {
     </figure>
   );
 }
+
+/** Front-page cartoon for signed-in players: the solver, now intrigued rather than stumped. */
+export function CuriousCartoon() {
+  return (
+    <figure className="pocket-cartoon">
+      <svg
+        viewBox="0 0 260 210"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="3.2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        role="img"
+        aria-label="Cartoon of a curious solver peering at a crossword through a magnifying glass"
+      >
+        {/* desk */}
+        <path d="M22 151c70-2.5 146-2.5 216 0" />
+        <path d="M40 152l-5 46M220 152l5 46" />
+
+        {/* body, leaning in */}
+        <path d="M78 150c3-27 15-43 36-45 6-.6 12-.6 18 0 21 2 33 18 36 45" />
+        <path d="M113 106l10 11 11-11" />
+
+        {/* head */}
+        <path d="M94 68c0-19 13-32 30-32s30 13 30 32-13 34-30 34-30-15-30-34z" />
+        <path d="M112 38c-2-9 3-15 9-17M123 36c1-8 6-12 12-12M133 39c4-6 9-8 14-6" />
+        {/* raised, interested brows */}
+        <path d="M103 56c4-5 10-5 14-1" />
+        <path d="M134 50c5-5 12-4 16 1" />
+        {/* left eye, wide open */}
+        <circle cx="111" cy="68" r="2.4" fill="currentColor" />
+        {/* smile */}
+        <path d="M108 86c6 8 18 8 25 0" />
+        {/* ear */}
+        <path d="M94 70c-5-2-8 2-7 7 .8 3.500 3.500 5 7 4" />
+
+        {/* magnifying glass over the right eye, which looks enormous through it */}
+        <circle cx="146" cy="70" r="19" fill="#ffffff" />
+        <circle cx="145" cy="71" r="7" fill="currentColor" />
+        <circle cx="147.5" cy="68.5" r="2" fill="#ffffff" stroke="none" />
+        <path d="M160 84l22 26" strokeWidth="5" />
+        {/* arm and hand holding the handle */}
+        <path d="M164 128c8-2 15-7 20-15" />
+        <path d="M178 107c5-3 10-1 11 4M181 114c5-2 9 0 10 4" />
+
+        {/* other arm pointing at the grid */}
+        <path d="M84 128c-10 5-16 11-18 20" />
+        <path d="M66 148l30-6" />
+
+        {/* newspaper with a tiny crossword */}
+        <path d="M90 150l8-22 74-2 8 24" />
+        <g strokeWidth="2">
+          <path d="M110 133h44l5 13h-54zM115 139.500h41M121 133l-3 13M132 133v13M143 133l3 13" />
+          <path d="M121 133h11l0 6.500h-12.500zM143 139.500h11.500l2.500 6.500h-11z" fill="currentColor" />
+        </g>
+
+        {/* idea bulb and sparkles */}
+        <g strokeWidth="2.600">
+          <path d="M52 22c-8 0-13 5.500-13 12 0 4.500 2.500 7.500 5 9.500 1.200 1 1.800 2.200 2 4h12c.2-1.800.8-3 2-4 2.500-2 5-5 5-9.500 0-6.500-5-12-13-12z" />
+          <path d="M47 52h10M49 57h6M52 10v5M32 16l3.500 3.500M72 16l-3.500 3.500M26 34h5M73 34h5" />
+        </g>
+        <path d="M212 44v14M205 51h14M228 78v8M224 82h8M204 96v6M201 99h6" strokeWidth="2.400" />
+      </svg>
+      <figcaption>
+        “Aha. So <em>that's</em> what four down has been hiding.”
+      </figcaption>
+    </figure>
+  );
+}

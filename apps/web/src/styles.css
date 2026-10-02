@@ -147,27 +147,22 @@ input {
 }
 
 .masthead-title {
-  position: relative;
-  display: block;
-  text-align: center;
+  align-self: center;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.22em;
   font-size: clamp(2rem, 4.2vh + 0.6vw, 3.2rem);
   font-weight: 900;
   line-height: 1.05;
-  /* Matching left padding keeps the spaced-out word centred. */
-  padding-left: 0.12em;
   letter-spacing: 0.12em;
   text-transform: uppercase;
   text-decoration: none;
 }
 
-/* Logo sits at the left edge of the masthead; the name stays centred. */
+/* Thinking face sits right beside the name. */
 .masthead-logo {
-  position: absolute;
-  left: 0;
-  top: 50%;
   height: 1.15em;
   width: auto;
-  transform: translateY(-50%);
 }
 
 .dateline {
@@ -216,6 +211,358 @@ input {
   border: 1px solid var(--ink);
   border-radius: 0;
   background: var(--cell);
+}
+
+/* Sign-in */
+
+.join {
+  align-self: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  width: min(100%, 440px);
+  padding: 22px 24px 18px;
+  border: 1px solid var(--ink);
+  outline: 1px solid var(--ink);
+  outline-offset: 4px;
+  background: var(--cell);
+}
+
+.join-title {
+  width: 100%;
+  padding-bottom: 8px;
+  border-bottom: 3px double var(--ink);
+  text-align: center;
+}
+
+.join .welcome-form {
+  width: 100%;
+}
+
+.join-or {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  font-size: 0.8rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.join-or::before,
+.join-or::after {
+  content: '';
+  flex: 1;
+  border-top: 1px solid var(--rule);
+}
+
+.small {
+  font-size: 0.85rem;
+}
+
+.google-button {
+  min-height: 40px;
+}
+
+.account {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 6px 16px;
+  margin-top: -8px;
+  font-size: 0.9rem;
+  text-align: center;
+}
+
+p.account {
+  display: block;
+}
+
+.link-button {
+  padding: 0;
+  border: 0;
+  background: none;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+/* Account menu in the dateline */
+
+.dateline-right {
+  position: relative;
+}
+
+.account-menu summary {
+  list-style: none;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.account-menu summary::-webkit-details-marker {
+  display: none;
+}
+
+.account-pop {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  width: 280px;
+  padding: 14px;
+  border: 1px solid var(--ink);
+  background: var(--cell);
+  font-size: 0.9rem;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+/* Level picker: the three level names as a miniature crossword with its own clue list */
+
+.level-picker {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 28px;
+}
+
+.mini-grid {
+  flex: none;
+  display: grid;
+  grid-template-columns: repeat(var(--cols), 44px);
+  gap: 1px;
+  padding: 2px;
+  background: var(--ink);
+}
+
+.mini-cell {
+  position: relative;
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  background: var(--cell);
+  font-family: var(--serif);
+  font-size: 1.45rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.mini-cell.active {
+  background: var(--cursor);
+}
+
+.mini-block {
+  background: var(--ink);
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.22);
+  cursor: default;
+}
+
+.mini-number {
+  position: absolute;
+  top: 2px;
+  left: 4px;
+  font-size: 0.62rem;
+  font-weight: 400;
+  line-height: 1;
+}
+
+.mini-clues {
+  flex: 1;
+  min-width: 260px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.mini-clue {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+  width: 100%;
+  padding: 9px 10px;
+  border: 0;
+  border-left: 3px solid transparent;
+  border-bottom: 1px solid var(--rule);
+  background: none;
+  font-family: var(--serif);
+  font-size: 1.05rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.mini-clue.active {
+  border-left-color: var(--ink);
+  background: var(--word);
+}
+
+.play-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 20px;
+}
+
+.play-row .button {
+  align-self: auto;
+  padding: 12px 26px;
+  font-size: 0.95rem;
+}
+
+.play-row .link-button {
+  font-style: italic;
+}
+
+/* Imprint: editor's note and letters, at the foot of the front page */
+
+.imprint {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0;
+  padding-top: 14px;
+  border-top: 3px double var(--ink);
+}
+
+.imprint-block {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 0 28px;
+}
+
+.imprint-block:first-child {
+  padding-left: 0;
+}
+
+.imprint-block + .imprint-block {
+  padding-right: 0;
+  border-left: 1px solid var(--rule);
+}
+
+.imprint-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 20px;
+  font-weight: 700;
+}
+
+@media (max-width: 700px) {
+  .imprint {
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: 16px;
+  }
+
+  .imprint-block,
+  .imprint-block + .imprint-block {
+    padding: 0;
+    border-left: 0;
+  }
+}
+
+/* Four-step strip in place of a wall of rules */
+
+.steps {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0;
+  margin: 0;
+  padding: 12px 0;
+  border-top: 3px double var(--ink);
+  border-bottom: 1px solid var(--ink);
+  list-style: none;
+}
+
+.steps li {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 0 12px;
+  border-left: 1px solid var(--rule);
+}
+
+.steps li:first-child {
+  border-left: 0;
+}
+
+.steps .spot {
+  width: 2em;
+  height: 2em;
+}
+
+.rulebook summary {
+  width: fit-content;
+  margin: 0 auto 14px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  text-decoration: underline;
+}
+
+@media (max-width: 700px) {
+  .steps {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    row-gap: 12px;
+  }
+
+  .steps li:nth-child(odd) {
+    border-left: 0;
+  }
+
+  .mini-grid {
+    margin: 0 auto;
+  }
+}
+
+/* Puzzle listing: one compact row per level */
+
+.puzzle-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) minmax(0, 1fr);
+  align-items: center;
+  gap: 16px;
+  padding: 10px 2px;
+  border-bottom: 1px solid var(--rule);
+}
+
+.puzzle-head {
+  padding: 0 2px 6px;
+  border-bottom-color: var(--ink);
+  font-size: 0.72rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.puzzle-level h3 {
+  font-size: 1.25rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.puzzle-level .muted {
+  font-size: 0.85rem;
+}
+
+.puzzle-row .button {
+  align-self: auto;
+  width: 100%;
+  text-align: center;
+}
+
+.table-note {
+  margin-top: 8px;
 }
 
 /* Home */
@@ -315,7 +662,7 @@ input {
 
 .welcome-cartoon {
   align-self: center;
-  width: min(100%, 320px);
+  width: min(100%, 300px);
 }
 
 .spot {
@@ -389,6 +736,17 @@ input {
 @media (max-width: 700px) {
   .guide {
     column-count: 1;
+  }
+}
+
+@media (max-width: 600px) {
+  .puzzle-row {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+
+  .puzzle-level,
+  .puzzle-head span:first-child {
+    grid-column: 1 / -1;
   }
 }
 

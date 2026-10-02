@@ -67,6 +67,13 @@ export interface PublicPuzzle {
 export interface Player {
   id: string;
   nickname: string;
+  /** True when the account is tied to a Google sign-in rather than only this browser. */
+  google: boolean;
+}
+
+export interface ConfigResponse {
+  /** Null when Google sign-in is not configured on this server. */
+  googleClientId: string | null;
 }
 
 export interface PlayerSession extends Player {

@@ -4,6 +4,7 @@ import type { ClueEntry } from '@crossword/shared';
 import { loadClueBank } from './clueBank';
 import type { AppContext } from './context';
 import { Store } from './db';
+import { createGoogleVerifier, type GoogleVerifier } from './google';
 import { registerLeaderboardRoutes } from './routes/leaderboard';
 import { registerPlayerRoutes } from './routes/players';
 import { registerPuzzleRoutes } from './routes/puzzles';
@@ -15,6 +16,10 @@ export interface AppOptions {
   logger?: boolean;
   /** Built web app to serve alongside the API; omitted in development, where Vite serves it. */
   staticDir?: string;
+  /** OAuth client id for Google sign-in; without it only guest play is offered. */
+  googleClientId?: string;
+  /** Replaces the real Google check in tests. */
+  verifyGoogle?: GoogleVerifier;
 }
 
 export function buildApp(options: AppOptions): FastifyInstance {
@@ -23,6 +28,9 @@ export function buildApp(options: AppOptions): FastifyInstance {
     store: new Store(options.dbPath),
     clues: options.clues ?? loadClueBank(),
     now: options.now ?? Date.now,
+    googleClientId: options.googleClientId ?? null,
+    verifyGoogle:
+      options.verifyGoogle ?? (options.googleClientId ? createGoogleVerifier(options.googleClientId) : async () => null),
   };
   app.addHook('onClose', async () => ctx.store.close());
 

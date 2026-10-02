@@ -1,102 +1,128 @@
 import { useEffect, useState } from 'react';
-import { DIFFICULTIES, DIFFICULTY_CONFIG, MAX_HINTS, type DailyStatusResponse, type Difficulty, type Player } from '@crossword/shared';
+import {
+  DIFFICULTIES,
+  MAX_HINTS,
+  type DailyStatus,
+  type DailyStatusResponse,
+  type Difficulty,
+  type PlayerSession,
+} from '@crossword/shared';
 import { api } from '../api';
-import { PocketCartoon } from '../components/Cartoons';
+import { AccountMenu } from '../components/AccountMenu';
+import { BulbSpot, CuriousCartoon, MagnifierSpot, PencilSpot, StopwatchSpot } from '../components/Cartoons';
 import { Guide } from '../components/Guide';
+import { Imprint } from '../components/Imprint';
+import { LevelPicker } from '../components/LevelPicker';
 import { Masthead } from '../components/Masthead';
 import { DIFFICULTY_LABEL } from '../format';
 
-function describe(difficulty: Difficulty): string {
-  const config = DIFFICULTY_CONFIG[difficulty];
-  return `Up to ${config.maxSize}×${config.maxSize} · about ${config.targetWords} words`;
+function playLabel(level: Difficulty, status: DailyStatus[Difficulty] | undefined): string {
+  const name = DIFFICULTY_LABEL[level];
+  if (status?.gaveUp) return `See ${name} answers`;
+  if (status?.finished) return `Review ${name} · ${status.score} pts`;
+  if (status?.started) return `Resume ${name} · clock running`;
+  return `Play today's ${name}`;
 }
 
-export function Home({ player }: { player: Player }) {
+interface HomeProps {
+  player: PlayerSession;
+  onSession: (player: PlayerSession) => void;
+  onSignOut: () => void;
+}
+
+export function Home({ player, onSession, onSignOut }: HomeProps) {
   const [daily, setDaily] = useState<DailyStatusResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [creating, setCreating] = useState<Difficulty | null>(null);
+  const [level, setLevel] = useState<Difficulty>('easy');
+  const [creating, setCreating] = useState(false);
 
   useEffect(() => {
-    api.dailyStatus().then(setDaily, (reason: Error) => setError(reason.message));
-  }, []);
+    api.dailyStatus().then(
+      (response) => {
+        setDaily(response);
+        // Open on the first level the player has not finished today.
+        setLevel(DIFFICULTIES.find((difficulty) => !response.status[difficulty].finished) ?? 'easy');
+      },
+      (reason: Error) => setError(reason.message),
+    );
+  }, [player.id]);
 
-  const startPractice = async (difficulty: Difficulty) => {
-    setCreating(difficulty);
+  const startPractice = async () => {
+    setCreating(true);
     try {
-      const created = await api.createPractice(difficulty);
+      const created = await api.createPractice(level);
       location.hash = `#/puzzle/${created.puzzleId}`;
     } catch (reason) {
       setError((reason as Error).message);
-      setCreating(null);
+      setCreating(false);
     }
   };
 
+  const status = daily?.status[level];
   return (
     <main className="page home">
-      <Masthead date={daily?.date} left="Front page" right={player.nickname} />
+      <Masthead
+        date={daily?.date}
+        left={<a href="#/leaderboard">Leaderboard</a>}
+        right={<AccountMenu player={player} onSession={onSession} onSignOut={onSignOut} />}
+      />
       <h1 className="headline">Think You Know It All? Prove It in Ink</h1>
-      <p className="standfirst">
-        Seventeen school subjects and pastimes, from history to sport to puns, crossed in one grid. {MAX_HINTS} hints, one
-        shot.
-      </p>
+      <p className="standfirst">Seventeen subjects. One grid. {MAX_HINTS} hints, one shot.</p>
 
       {error && <p className="error">{error}</p>}
 
       <div className="front">
-        <div className="front-main">
-      <section>
-        <div className="section-title">
-          <h2>Today's Edition: Hot Off the Press</h2>
-          <span className="muted">Clock starts when the puzzle opens · one attempt per level</span>
-        </div>
-        <div className="cards">
-          {DIFFICULTIES.map((difficulty) => {
-            const status = daily?.status[difficulty];
-            return (
-              <a key={difficulty} className="card" href={`#/daily/${difficulty}`}>
-                <h3>{DIFFICULTY_LABEL[difficulty]}</h3>
-                <p className="muted">{describe(difficulty)}</p>
-                <p className="card-status">
-                  {status?.gaveUp ? 'Gave up · see answers' : status?.finished ? `Finished · ${status.score} pts` : status?.started ? 'In progress · clock running' : 'Play'}
-                </p>
-              </a>
-            );
-          })}
-        </div>
-      </section>
-
-      <section>
-        <div className="section-title">
-          <h2>Practice Sheets: No One Is Watching</h2>
-          <span className="muted">Fresh random puzzle, not ranked</span>
-        </div>
-        <div className="cards">
-          {DIFFICULTIES.map((difficulty) => (
-            <button
-              key={difficulty}
-              type="button"
-              className="card"
-              disabled={creating !== null}
-              onClick={() => startPractice(difficulty)}
-            >
-              <h3>{DIFFICULTY_LABEL[difficulty]}</h3>
-              <p className="muted">{describe(difficulty)}</p>
-              <p className="card-status">{creating === difficulty ? 'Building…' : 'New puzzle'}</p>
+        <section className="front-main">
+          <h2>Start here: solve your level</h2>
+          <LevelPicker selected={level} status={daily?.status} onSelect={setLevel} />
+          <div className="play-row">
+            <a className={status?.finished ? 'button' : 'button primary'} href={`#/daily/${level}`}>
+              {playLabel(level, status)}
+            </a>
+            <button type="button" className="link-button" disabled={creating} onClick={startPractice}>
+              {creating ? 'Building…' : `or warm up on a practice ${DIFFICULTY_LABEL[level]}, unranked`}
             </button>
-          ))}
-        </div>
-      </section>
+          </div>
+        </section>
 
-      <a className="button" href="#/leaderboard">
-        Today's leaderboard →
-      </a>
-        </div>
         <aside className="front-aside">
-          <PocketCartoon />
+          <CuriousCartoon />
         </aside>
       </div>
 
-      <Guide />
+      <ol className="steps">
+        <li>
+          <PencilSpot />
+          <span>
+            <strong>Answer</strong> each clue in the grid
+          </span>
+        </li>
+        <li>
+          <MagnifierSpot />
+          <span>
+            <strong>{MAX_HINTS} hints</strong> reveal a letter
+          </span>
+        </li>
+        <li>
+          <StopwatchSpot />
+          <span>
+            <strong>Faster</strong> scores higher
+          </span>
+        </li>
+        <li>
+          <BulbSpot />
+          <span>
+            <strong>Submit once</strong>, any time
+          </span>
+        </li>
+      </ol>
+
+      <details className="rulebook">
+        <summary>Read the full rulebook</summary>
+        <Guide />
+      </details>
+
+      <Imprint />
     </main>
   );
 }

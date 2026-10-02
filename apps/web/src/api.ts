@@ -1,4 +1,5 @@
 import type {
+  ConfigResponse,
   DailyStatusResponse,
   Difficulty,
   GiveUpResponse,
@@ -43,6 +44,9 @@ async function request<T>(path: string, init: { method?: string; body?: unknown 
 }
 
 export const api = {
+  config: () => request<ConfigResponse>('/api/config'),
+  googleSignIn: (credential: string) =>
+    request<PlayerSession>('/api/auth/google', { method: 'POST', body: { credential } }),
   createPlayer: (nickname: string) => request<PlayerSession>('/api/players', { method: 'POST', body: { nickname } }),
   dailyStatus: () => request<DailyStatusResponse>('/api/puzzles/daily/status'),
   daily: (difficulty: Difficulty) => request<PuzzleResponse>(`/api/puzzles/daily?difficulty=${difficulty}`),

@@ -24,7 +24,17 @@ let clock: number;
 
 beforeEach(() => {
   clock = START;
-  app = buildApp({ dbPath: ':memory:', clues, now: () => clock });
+  app = buildApp({
+    dbPath: ':memory:',
+    clues,
+    now: () => clock,
+    googleClientId: 'test-client',
+    // Stand-in for Google: a credential "ok:<id>:<name>" is valid, anything else is not.
+    verifyGoogle: async (credential) => {
+      const [status, sub, name] = credential.split(':');
+      return status === 'ok' ? { sub, name } : null;
+    },
+  });
 });
 
 afterEach(async () => {
@@ -66,6 +76,53 @@ describe('players', () => {
       headers: { authorization: 'Bearer nope' },
     });
     expect(response.statusCode).toBe(401);
+  });
+});
+
+describe('google sign-in', () => {
+  const google = (credential: string, player?: PlayerSession) =>
+    app.inject({ method: 'POST', url: '/api/auth/google', headers: player ? auth(player) : {}, payload: { credential } });
+
+  it('tells the client which Google client id to use', async () => {
+    expect((await app.inject({ url: '/api/config' })).json()).toEqual({ googleClientId: 'test-client' });
+  });
+
+  it('creates an account on first sign-in and returns the same one afterwards', async () => {
+    const first = await google('ok:g-1:Ada');
+    expect(first.statusCode).toBe(201);
+    const created: PlayerSession = first.json();
+    expect(created).toMatchObject({ nickname: 'Ada', google: true });
+
+    const again: PlayerSession = (await google('ok:g-1:Renamed')).json();
+    expect(again).toEqual(created);
+  });
+
+  it('rejects a credential Google does not vouch for', async () => {
+    expect((await google('forged:g-1:Ada')).statusCode).toBe(400);
+    expect((await app.inject({ method: 'POST', url: '/api/auth/google', payload: {} })).statusCode).toBe(400);
+  });
+
+  it('upgrades a guest in place, keeping its scores', async () => {
+    const guest = await join('Guest');
+    expect(guest.google).toBe(false);
+    const { puzzleId } = await daily(guest);
+    await submit(guest, puzzleId, easySolution());
+
+    const linked: PlayerSession = (await google('ok:g-2:Ada', guest)).json();
+    expect(linked).toMatchObject({ id: guest.id, token: guest.token, nickname: 'Guest', google: true });
+    expect((await daily(linked)).attempt.score).not.toBeNull();
+
+    // Signing in on another device reaches the same account.
+    expect((await google('ok:g-2:Ada')).json().id).toBe(guest.id);
+  });
+
+  it('switches to the existing Google account rather than overwriting it', async () => {
+    const owner: PlayerSession = (await google('ok:g-3:Owner')).json();
+    const guest = await join('Guest');
+    const result: PlayerSession = (await google('ok:g-3:Owner', guest)).json();
+    expect(result.id).toBe(owner.id);
+    const me = await app.inject({ url: '/api/me', headers: auth(guest) });
+    expect(me.json()).toMatchObject({ id: guest.id, google: false });
   });
 });
 

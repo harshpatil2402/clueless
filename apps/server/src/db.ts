@@ -5,6 +5,8 @@ export interface PlayerRow {
   id: string;
   nickname: string;
   token: string;
+  /** Set once the player has signed in with Google; null for guests. */
+  google_id: string | null;
 }
 
 export interface PuzzleRow {
@@ -43,7 +45,8 @@ const SCHEMA = `
     id TEXT PRIMARY KEY,
     nickname TEXT NOT NULL,
     token TEXT NOT NULL UNIQUE,
-    created_at INTEGER NOT NULL
+    created_at INTEGER NOT NULL,
+    google_id TEXT
   );
   CREATE TABLE IF NOT EXISTS puzzles (
     id TEXT PRIMARY KEY,
@@ -78,6 +81,9 @@ export class Store {
     this.db.exec(SCHEMA);
     // Databases created before give-up existed lack these columns.
     const columns = (this.db.prepare('PRAGMA table_info(attempts)').all() as Array<{ name: string }>).map((c) => c.name);
+    const playerColumns = (this.db.prepare('PRAGMA table_info(players)').all() as Array<{ name: string }>).map((c) => c.name);
+    if (!playerColumns.includes('google_id')) this.db.exec('ALTER TABLE players ADD COLUMN google_id TEXT');
+    this.db.exec('CREATE UNIQUE INDEX IF NOT EXISTS players_by_google ON players (google_id)');
     if (!columns.includes('gave_up')) this.db.exec('ALTER TABLE attempts ADD COLUMN gave_up INTEGER NOT NULL DEFAULT 0');
     if (!columns.includes('final_grid')) this.db.exec('ALTER TABLE attempts ADD COLUMN final_grid TEXT');
     if (!columns.includes('hints_used')) this.db.exec('ALTER TABLE attempts ADD COLUMN hints_used INTEGER NOT NULL DEFAULT 0');
@@ -90,14 +96,24 @@ export class Store {
 
   createPlayer(player: PlayerRow, createdAt: number): void {
     this.db
-      .prepare('INSERT INTO players (id, nickname, token, created_at) VALUES (?, ?, ?, ?)')
-      .run(player.id, player.nickname, player.token, createdAt);
+      .prepare('INSERT INTO players (id, nickname, token, created_at, google_id) VALUES (?, ?, ?, ?, ?)')
+      .run(player.id, player.nickname, player.token, createdAt, player.google_id);
   }
 
   playerByToken(token: string): PlayerRow | undefined {
-    return this.db.prepare('SELECT id, nickname, token FROM players WHERE token = ?').get(token) as
+    return this.db.prepare('SELECT id, nickname, token, google_id FROM players WHERE token = ?').get(token) as
       | PlayerRow
       | undefined;
+  }
+
+  playerByGoogleId(googleId: string): PlayerRow | undefined {
+    return this.db.prepare('SELECT id, nickname, token, google_id FROM players WHERE google_id = ?').get(googleId) as
+      | PlayerRow
+      | undefined;
+  }
+
+  linkGoogle(playerId: string, googleId: string): void {
+    this.db.prepare('UPDATE players SET google_id = ? WHERE id = ?').run(googleId, playerId);
   }
 
   getPuzzle(id: string): PuzzleRow | undefined {

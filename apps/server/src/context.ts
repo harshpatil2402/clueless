@@ -1,11 +1,14 @@
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import { DIFFICULTIES, type ClueEntry, type Difficulty } from '@crossword/shared';
 import type { PlayerRow, Store } from './db';
+import type { GoogleVerifier } from './google';
 
 export interface AppContext {
   store: Store;
   clues: ClueEntry[];
   now: () => number;
+  googleClientId: string | null;
+  verifyGoogle: GoogleVerifier;
 }
 
 export function playerFromRequest(ctx: AppContext, request: FastifyRequest): PlayerRow | undefined {

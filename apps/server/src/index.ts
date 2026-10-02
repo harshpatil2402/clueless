@@ -9,7 +9,11 @@ mkdirSync(dirname(dbPath), { recursive: true });
 // In production the built web app is served from the same origin as the API.
 const webDist = fileURLToPath(new URL('../../web/dist', import.meta.url));
 
-const app = buildApp({ dbPath, logger: true, staticDir: existsSync(webDist) ? webDist : undefined });
+// A client id is public by design; it only names this app to Google. Override per deployment if needed.
+const googleClientId =
+  process.env.GOOGLE_CLIENT_ID ?? '821973869510-23ha0hpki34i704594qrvg9gh7l1r663.apps.googleusercontent.com';
+
+const app = buildApp({ dbPath, logger: true, staticDir: existsSync(webDist) ? webDist : undefined, googleClientId });
 const port = Number(process.env.PORT ?? 3001);
 
 // Hosting platforms inject PORT and need the server reachable from outside the container;

@@ -22,11 +22,6 @@ const SCHOOL_STAGE = {
 export function Guide() {
   return (
     <section className="guide-section">
-      <div className="section-title">
-        <h2>The Rulebook: Read All About It</h2>
-        <span className="muted">Read once, play forever</span>
-      </div>
-
       <div className="guide">
         <article className="lead">
           <h3>
