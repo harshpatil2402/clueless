@@ -3,6 +3,7 @@ import { DIFFICULTIES, type PlayerSession } from '@crossword/shared';
 import { api } from './api';
 import { PocketCartoon } from './components/Cartoons';
 import { GoogleButton } from './components/GoogleButton';
+import { Imprint } from './components/Imprint';
 import { Masthead } from './components/Masthead';
 import { Game, type GameTarget } from './pages/Game';
 import { Home } from './pages/Home';
@@ -86,6 +87,7 @@ function Welcome({ onSession }: { onSession: (player: PlayerSession) => void }) 
         {error && <p className="error">{error}</p>}
       </div>
 
+      <Imprint />
     </main>
   );
 }
