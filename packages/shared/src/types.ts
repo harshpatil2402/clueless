@@ -77,9 +77,20 @@ export interface AttemptView {
   startedAt: number;
   finishedAt: number | null;
   elapsedSeconds: number;
-  wrongSubmits: number;
+  hintsUsed: number;
   score: number | null;
   gaveUp: boolean;
+}
+
+/** A letter the player chose to reveal. */
+export interface Hint {
+  row: number;
+  col: number;
+  letter: string;
+}
+
+export interface HintResponse extends Hint {
+  hintsLeft: number;
 }
 
 export type EntryStatus = 'correct' | 'wrong' | 'unanswered';
@@ -102,8 +113,10 @@ export interface PuzzleResponse {
   attempt: AttemptView;
   /** Filled grid rows, only present once the attempt is finished. */
   solution: string[] | null;
-  /** Per-entry outcome, only present when the player gave up. */
+  /** Per-entry outcome, present once the attempt is finished (submitted or given up). */
   review: EntryReview[] | null;
+  /** Letters revealed so far, so a reload can restore and lock them. */
+  hints: Hint[];
 }
 
 export interface GiveUpResponse {
@@ -112,9 +125,17 @@ export interface GiveUpResponse {
   elapsedSeconds: number;
 }
 
-export type SubmitResponse =
-  | { solved: false; wrongEntries: number; wrongSubmits: number }
-  | { solved: true; score: number; elapsedSeconds: number; wrongSubmits: number; rank: number | null; solution: string[] };
+/** Submitting is final and may happen at any point: the score counts whatever is correct. */
+export interface SubmitResponse {
+  score: number;
+  elapsedSeconds: number;
+  correctEntries: number;
+  totalEntries: number;
+  hintsUsed: number;
+  rank: number | null;
+  solution: string[];
+  review: EntryReview[];
+}
 
 export interface LeaderboardRow {
   rank: number;

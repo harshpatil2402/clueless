@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent, type MouseEvent } from 'react';
 import {
-  WRONG_SUBMIT_PENALTY,
+  HINT_PENALTY,
+  MAX_HINTS,
   entryCells,
   type Difficulty,
   type EntryReview,
@@ -18,8 +19,6 @@ import { useCrossword } from '../hooks/useCrossword';
 import { clearGrid } from '../storage';
 
 export type GameTarget = { kind: 'daily'; difficulty: Difficulty } | { kind: 'puzzle'; id: string };
-
-type Solved = Extract<SubmitResponse, { solved: true }>;
 
 const PLACEHOLDER = ' ';
 
@@ -67,16 +66,22 @@ export function Game({ target }: { target: GameTarget }) {
 
 function Board({ data }: { data: PuzzleResponse }) {
   const { puzzle, puzzleId } = data;
-  const crossword = useCrossword(puzzle, puzzleId, data.solution);
-  const [result, setResult] = useState<Solved | null>(null);
+  const crossword = useCrossword(puzzle, puzzleId, data.solution, data.hints);
+  const [result, setResult] = useState<SubmitResponse | null>(null);
   const [showModal, setShowModal] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
-  const [submitting, setSubmitting] = useState(false);
-  const [confirmingGiveUp, setConfirmingGiveUp] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [confirming, setConfirming] = useState<'submit' | 'giveup' | null>(null);
   const [review, setReview] = useState<EntryReview[] | null>(data.review);
-  const [gaveUpSeconds, setGaveUpSeconds] = useState<number | null>(null);
+  const [gaveUp, setGaveUp] = useState(data.attempt.gaveUp);
+  const [endSeconds, setEndSeconds] = useState<number | null>(
+    data.attempt.finishedAt !== null ? data.attempt.elapsedSeconds : null,
+  );
+  const [hintsUsed, setHintsUsed] = useState(data.attempt.hintsUsed);
+  const hintsLeft = MAX_HINTS - hintsUsed;
+  const finalScore = result?.score ?? data.attempt.score;
 
-  // Cells where the player's letter was wrong or missing when they gave up.
+  // Cells where the player's letter was wrong or missing when the puzzle ended.
   const missed = useMemo(() => {
     const cells = new Set<string>();
     review?.forEach((entry, index) => {
@@ -87,10 +92,6 @@ function Board({ data }: { data: PuzzleResponse }) {
     return cells;
   }, [review, puzzle]);
   const tally = (status: EntryReview['status']) => review?.filter((entry) => entry.status === status).length ?? 0;
-
-  const finalSeconds =
-    result?.elapsedSeconds ?? gaveUpSeconds ?? (data.attempt.finishedAt !== null ? data.attempt.elapsedSeconds : null);
-  const finalScore = result?.score ?? data.attempt.score;
 
   // The key listener is attached once; it reads the latest handlers through this ref.
   const handlers = useRef(crossword);
@@ -115,42 +116,52 @@ function Board({ data }: { data: PuzzleResponse }) {
     return () => window.removeEventListener('keydown', onKey);
   }, []);
 
-  const submit = async () => {
-    setSubmitting(true);
+  /** Runs a server call that ends or changes the attempt, with shared busy and error handling. */
+  const run = async (action: () => Promise<void>) => {
+    setBusy(true);
     setMessage(null);
     try {
-      const response = await api.submit(puzzleId, crossword.toGrid());
-      if (response.solved) {
-        clearGrid(puzzleId);
-        crossword.showSolution(response.solution);
-        setResult(response);
-        setShowModal(true);
-      } else {
-        const entries = response.wrongEntries === 1 ? '1 entry is' : `${response.wrongEntries} entries are`;
-        setMessage(`${entries} wrong. −${WRONG_SUBMIT_PENALTY} points.`);
-      }
+      await action();
     } catch (reason) {
       setMessage((reason as Error).message);
     } finally {
-      setSubmitting(false);
+      setBusy(false);
+      setConfirming(null);
     }
   };
 
-  const giveUp = async () => {
-    setSubmitting(true);
-    setMessage(null);
-    try {
+  const submit = () =>
+    run(async () => {
+      const response = await api.submit(puzzleId, crossword.toGrid());
+      clearGrid(puzzleId);
+      crossword.showSolution(response.solution);
+      setReview(response.review);
+      setEndSeconds(response.elapsedSeconds);
+      setResult(response);
+      setShowModal(true);
+    });
+
+  const giveUp = () =>
+    run(async () => {
       const response = await api.giveUp(puzzleId, crossword.toGrid());
       clearGrid(puzzleId);
       crossword.showSolution(response.solution);
       setReview(response.review);
-      setGaveUpSeconds(response.elapsedSeconds);
-    } catch (reason) {
-      setMessage((reason as Error).message);
-    } finally {
-      setSubmitting(false);
-      setConfirmingGiveUp(false);
+      setEndSeconds(response.elapsedSeconds);
+      setGaveUp(true);
+    });
+
+  const useHint = () => {
+    const { row, col } = crossword.cursor;
+    if (crossword.locked.has(`${row},${col}`)) {
+      setMessage('That letter is already revealed. Pick another box.');
+      return;
     }
+    return run(async () => {
+      const response = await api.hint(puzzleId, row, col);
+      crossword.reveal(response);
+      setHintsUsed(MAX_HINTS - response.hintsLeft);
+    });
   };
 
   // Phones only raise their keyboard for a focused text field, so a hidden one sits behind the grid.
@@ -170,7 +181,78 @@ function Board({ data }: { data: PuzzleResponse }) {
     setMessage(null);
   };
 
-  const { activeEntry } = crossword;
+  const { activeEntry, emptyCount } = crossword;
+  const emptyText = emptyCount === 0 ? 'Grid full.' : `${emptyCount} ${emptyCount === 1 ? 'box' : 'boxes'} empty.`;
+
+  let controls;
+  if (review) {
+    controls = (
+      <p className="solved-banner">
+        {gaveUp ? (
+          <strong>You gave up.</strong>
+        ) : (
+          <>
+            <strong>{finalScore} points.</strong>
+            {data.kind === 'daily' && (
+              <>
+                {' '}
+                <a href="#/leaderboard">Leaderboard</a>.
+              </>
+            )}
+          </>
+        )}{' '}
+        {tally('correct')} of {review.length} correct · {tally('wrong')} wrong · {tally('unanswered')} not answered.
+        {missed.size > 0 && ' Answers are beside each clue; missed letters are in red.'}
+      </p>
+    );
+  } else if (crossword.readOnly) {
+    // Attempts finished before reviews were stored have only a score.
+    controls = (
+      <p className="solved-banner">
+        Solved — <strong>{finalScore}</strong> points
+      </p>
+    );
+  } else if (confirming) {
+    controls = (
+      <div className="submit-row">
+        <span role="status">
+          {confirming === 'submit'
+            ? `Final submit? ${emptyText}`
+            : 'Give up? Answers shown, score 0.'}
+        </span>
+        <button type="button" className="button primary" disabled={busy} onClick={confirming === 'submit' ? submit : giveUp}>
+          {confirming === 'submit' ? 'Yes, submit' : 'Yes, give up'}
+        </button>
+        <button type="button" className="button" disabled={busy} onClick={() => setConfirming(null)}>
+          Keep going
+        </button>
+      </div>
+    );
+  } else {
+    controls = (
+      <div className="submit-row">
+        <button type="button" className="button primary" disabled={busy} onClick={() => setConfirming('submit')}>
+          Submit
+        </button>
+        <button
+          type="button"
+          className="button"
+          disabled={busy || hintsLeft === 0}
+          title={`Reveals the letter in the selected box. Costs ${HINT_PENALTY} points.`}
+          onClick={useHint}
+        >
+          Hint · {hintsLeft} left
+        </button>
+        <span className={message ? 'error' : 'muted'} role="status">
+          {message ?? emptyText}
+        </span>
+        <button type="button" className="button give-up" disabled={busy} onClick={() => setConfirming('giveup')}>
+          Give up
+        </button>
+      </div>
+    );
+  }
+
   return (
     <main className="page game">
       <Masthead
@@ -183,7 +265,7 @@ function Board({ data }: { data: PuzzleResponse }) {
             </span>
           </>
         }
-        right={<Timer baseSeconds={data.attempt.elapsedSeconds} finalSeconds={finalSeconds} />}
+        right={<Timer baseSeconds={data.attempt.elapsedSeconds} finalSeconds={endSeconds} />}
       />
 
       <div className="game-body" onClick={focusInput}>
@@ -212,54 +294,7 @@ function Board({ data }: { data: PuzzleResponse }) {
               <CategoryTag category={activeEntry.category} />
             </span>
           </div>
-
-          {review ? (
-            <p className="solved-banner">
-              <strong>You gave up.</strong> {tally('correct')} of {review.length} correct · {tally('wrong')} wrong ·{' '}
-              {tally('unanswered')} not answered. Answers are beside each clue; missed letters are in red.
-            </p>
-          ) : crossword.readOnly ? (
-            <p className="solved-banner">
-              Solved — <strong>{finalScore}</strong> points
-              {data.kind === 'daily' && (
-                <>
-                  {' · '}
-                  <a href="#/leaderboard">Leaderboard</a>
-                </>
-              )}
-            </p>
-          ) : (
-            <>
-              {confirmingGiveUp ? (
-                <div className="submit-row">
-                  <span role="status">Give up? Answers shown, score 0.</span>
-                  <button type="button" className="button primary" disabled={submitting} onClick={giveUp}>
-                    Yes, give up
-                  </button>
-                  <button type="button" className="button" disabled={submitting} onClick={() => setConfirmingGiveUp(false)}>
-                    Keep going
-                  </button>
-                </div>
-              ) : (
-                <div className="submit-row">
-                  <button
-                    type="button"
-                    className="button primary"
-                    disabled={!crossword.isFull || submitting}
-                    onClick={submit}
-                  >
-                    {submitting ? 'Checking…' : 'Submit'}
-                  </button>
-                  <span className={message ? 'error' : 'muted'} role="status">
-                    {message ?? (crossword.isFull ? 'Grid full. Ready to submit.' : 'Fill every cell to submit.')}
-                  </span>
-                  <button type="button" className="button give-up" onClick={() => setConfirmingGiveUp(true)}>
-                    Give up
-                  </button>
-                </div>
-              )}
-            </>
-          )}
+          {controls}
         </div>
 
         <ClueList crossword={crossword} entries={puzzle.entries} review={review} />

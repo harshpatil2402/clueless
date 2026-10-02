@@ -23,6 +23,7 @@ export function Grid({ crossword, missed }: GridProps) {
             if (active.has(`${r},${c}`)) classes.push('in-word');
             if (cursor.row === r && cursor.col === c) classes.push('cursor');
             if (missed?.has(`${r},${c}`)) classes.push('missed');
+            if (crossword.locked.has(`${r},${c}`)) classes.push('hinted');
             return (
               <button
                 key={`${r},${c}`}

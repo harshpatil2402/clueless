@@ -1,10 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
 import {
+  HINT_PENALTY,
+  MAX_HINTS,
   computeScore,
   generatePuzzle,
   solutionGrid,
   type GiveUpResponse,
+  type HintResponse,
   type LeaderboardResponse,
   type PlayerSession,
   type PuzzleResponse,
@@ -47,14 +50,6 @@ async function submit(player: PlayerSession, puzzleId: string, grid: string[]) {
 }
 
 const easySolution = () => solutionGrid(generatePuzzle(clues, 'easy', '2026-10-02:easy'));
-
-/** Replaces the first letter of the grid with a letter that is certainly wrong. */
-function spoil(grid: string[]): string[] {
-  const copy = [...grid];
-  const row = copy.findIndex((line) => /[A-Z]/.test(line));
-  copy[row] = copy[row].replace(/[A-Z]/, (letter) => (letter === 'X' ? 'Y' : 'X'));
-  return copy;
-}
 
 describe('players', () => {
   it('rejects empty and oversized nicknames', async () => {
@@ -112,48 +107,112 @@ describe('daily puzzle', () => {
 });
 
 describe('submit', () => {
-  it('counts wrong entries without saying which, and penalises', async () => {
-    const player = await join('Ada');
-    const { puzzleId } = await daily(player);
-    const response = await submit(player, puzzleId, spoil(easySolution()));
-    const body: SubmitResponse = response.json();
-    expect(body.solved).toBe(false);
-    expect(body).toMatchObject({ wrongSubmits: 1 });
-    expect(Object.keys(body).sort()).toEqual(['solved', 'wrongEntries', 'wrongSubmits']);
-  });
-
   it('rejects a grid of the wrong shape', async () => {
     const player = await join('Ada');
     const { puzzleId } = await daily(player);
     expect((await submit(player, puzzleId, ['ABC'])).statusCode).toBe(400);
   });
 
-  it('finishes the attempt with a server-timed score', async () => {
+  it('scores a fully solved grid with a server-timed bonus', async () => {
     const player = await join('Ada');
     const { puzzleId, puzzle } = await daily(player);
-    await submit(player, puzzleId, spoil(easySolution()));
     clock += 150_000;
     const body: SubmitResponse = (await submit(player, puzzleId, easySolution())).json();
-    const expected = computeScore({
-      difficulty: 'easy',
-      wordCount: puzzle.entries.length,
-      elapsedSeconds: 150,
-      wrongSubmits: 1,
-    });
-    expect(body).toMatchObject({ solved: true, score: expected, elapsedSeconds: 150, wrongSubmits: 1, rank: 1 });
+    const total = puzzle.entries.length;
+    const expected = computeScore({ difficulty: 'easy', correctEntries: total, elapsedSeconds: 150, hintsUsed: 0 });
+    expect(body).toMatchObject({ score: expected, elapsedSeconds: 150, correctEntries: total, totalEntries: total, rank: 1 });
+    expect(body.review.every((entry) => entry.status === 'correct')).toBe(true);
 
-    // Solved puzzle reopens read-only with the solution, and cannot be submitted again.
+    // Finished puzzle reopens read-only with the solution, and cannot be submitted again.
     const reopened = await daily(player);
     expect(reopened.solution).toEqual(easySolution());
     expect(reopened.attempt.score).toBe(expected);
+    expect(reopened.review).toEqual(body.review);
     expect((await submit(player, puzzleId, easySolution())).statusCode).toBe(409);
+  });
+
+  it('can be submitted part-way, scoring only the correct entries', async () => {
+    const player = await join('Ada');
+    const { puzzleId } = await daily(player);
+    const puzzle = generatePuzzle(clues, 'easy', '2026-10-02:easy');
+    const first = puzzle.entries[0];
+    const grid: string[][] = easySolution().map((row) => [...row].map((char) => (char === '.' ? '.' : ' ')));
+    [...first.answer].forEach((letter, i) => {
+      if (first.direction === 'across') grid[first.row][first.col + i] = letter;
+      else grid[first.row + i][first.col] = letter;
+    });
+
+    clock += 300_000; // par time for easy: no time bonus
+    const body: SubmitResponse = (await submit(player, puzzleId, grid.map((row) => row.join('')))).json();
+    expect(body).toMatchObject({ score: 100, correctEntries: 1, totalEntries: puzzle.entries.length });
+    expect(body.review[0].status).toBe('correct');
+    expect(body.review.slice(1).every((entry) => entry.status === 'unanswered')).toBe(true);
+    expect(body.solution).toEqual(easySolution());
   });
 
   it('accepts lowercase letters', async () => {
     const player = await join('Ada');
-    const { puzzleId } = await daily(player);
+    const { puzzleId, puzzle } = await daily(player);
     const grid = easySolution().map((row) => row.toLowerCase());
-    expect((await submit(player, puzzleId, grid)).json().solved).toBe(true);
+    expect((await submit(player, puzzleId, grid)).json().correctEntries).toBe(puzzle.entries.length);
+  });
+});
+
+describe('hints', () => {
+  const hint = (player: PlayerSession, puzzleId: string, row: number, col: number) =>
+    app.inject({ method: 'POST', url: `/api/puzzles/${puzzleId}/hint`, headers: auth(player), payload: { row, col } });
+
+  const letterCells = () =>
+    easySolution().flatMap((line, row) => [...line].flatMap((char, col) => (char === '.' ? [] : [[row, col, char] as const])));
+
+  it('reveals the letter of a cell and counts down', async () => {
+    const player = await join('Ada');
+    const { puzzleId } = await daily(player);
+    const [row, col, letter] = letterCells()[0];
+    const body: HintResponse = (await hint(player, puzzleId, row, col)).json();
+    expect(body).toEqual({ row, col, letter, hintsLeft: MAX_HINTS - 1 });
+
+    // Asking again for the same cell is free, and a reload brings the hint back.
+    expect((await hint(player, puzzleId, row, col)).json().hintsLeft).toBe(MAX_HINTS - 1);
+    const reopened = await daily(player);
+    expect(reopened.hints).toEqual([{ row, col, letter }]);
+    expect(reopened.attempt.hintsUsed).toBe(1);
+  });
+
+  it('refuses blocks, bad cells and a hint beyond the limit', async () => {
+    const player = await join('Ada');
+    const { puzzleId } = await daily(player);
+    const solution = easySolution();
+    const blockRow = solution.findIndex((line) => line.includes('.'));
+    expect((await hint(player, puzzleId, blockRow, solution[blockRow].indexOf('.'))).statusCode).toBe(400);
+    expect((await hint(player, puzzleId, 99, 0)).statusCode).toBe(400);
+
+    const cells = letterCells();
+    for (let i = 0; i < MAX_HINTS; i++) expect((await hint(player, puzzleId, cells[i][0], cells[i][1])).statusCode).toBe(200);
+    const extra = await hint(player, puzzleId, cells[MAX_HINTS][0], cells[MAX_HINTS][1]);
+    expect(extra.statusCode).toBe(409);
+  });
+
+  it('charges a penalty per hint and counts revealed letters as filled', async () => {
+    const player = await join('Ada');
+    const { puzzleId, puzzle } = await daily(player);
+    const [row, col] = letterCells()[0];
+    await hint(player, puzzleId, row, col);
+
+    // The client sends that cell blank; the server still knows the letter was revealed.
+    const grid = easySolution().map((line, r) => (r === row ? line.slice(0, col) + ' ' + line.slice(col + 1) : line));
+    clock += 300_000;
+    const body: SubmitResponse = (await submit(player, puzzleId, grid)).json();
+    const total = puzzle.entries.length;
+    expect(body).toMatchObject({ correctEntries: total, hintsUsed: 1, score: 100 * total - HINT_PENALTY });
+  });
+
+  it('is refused once the puzzle is finished', async () => {
+    const player = await join('Ada');
+    const { puzzleId } = await daily(player);
+    await submit(player, puzzleId, easySolution());
+    const [row, col] = letterCells()[0];
+    expect((await hint(player, puzzleId, row, col)).statusCode).toBe(409);
   });
 });
 
@@ -206,7 +265,7 @@ describe('give up', () => {
     await giveUp(quitter, puzzleId, easySolution().map((row) => row.replace(/[A-Z]/g, ' ')));
     clock += 9_999_000;
     const result: SubmitResponse = (await submit(solver, puzzleId, easySolution())).json();
-    expect(result).toMatchObject({ solved: true, rank: 1 });
+    expect(result.rank).toBe(1);
   });
 });
 
@@ -242,7 +301,7 @@ describe('leaderboard', () => {
     const practice: PuzzleResponse = created.json();
     const grid = solutionGrid(generatePuzzle(clues, 'easy', practice.puzzleId));
     const result: SubmitResponse = (await submit(player, practice.puzzleId, grid)).json();
-    expect(result).toMatchObject({ solved: true, rank: null });
+    expect(result.rank).toBeNull();
     const board: LeaderboardResponse = (await app.inject({ url: '/api/leaderboard?difficulty=easy' })).json();
     expect(board.rows).toEqual([]);
   });

@@ -24,6 +24,7 @@ export function Masthead({ left, right, date }: MastheadProps) {
   return (
     <header className="masthead">
       <a className="masthead-title" href="#/">
+        <img className="masthead-logo" src="/thinking.svg" alt="" />
         Clueless
       </a>
       <div className="dateline">

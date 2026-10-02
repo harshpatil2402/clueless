@@ -2,6 +2,7 @@ import type {
   DailyStatusResponse,
   Difficulty,
   GiveUpResponse,
+  HintResponse,
   LeaderboardResponse,
   PlayerSession,
   PuzzleResponse,
@@ -50,6 +51,8 @@ export const api = {
   puzzle: (id: string) => request<PuzzleResponse>(`/api/puzzles/${encodeURIComponent(id)}`),
   submit: (id: string, grid: string[]) =>
     request<SubmitResponse>(`/api/puzzles/${encodeURIComponent(id)}/submit`, { method: 'POST', body: { grid } }),
+  hint: (id: string, row: number, col: number) =>
+    request<HintResponse>(`/api/puzzles/${encodeURIComponent(id)}/hint`, { method: 'POST', body: { row, col } }),
   giveUp: (id: string, grid: string[]) =>
     request<GiveUpResponse>(`/api/puzzles/${encodeURIComponent(id)}/giveup`, { method: 'POST', body: { grid } }),
   leaderboard: (difficulty: Difficulty) => request<LeaderboardResponse>(`/api/leaderboard?difficulty=${difficulty}`),

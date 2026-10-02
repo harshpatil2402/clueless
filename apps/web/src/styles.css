@@ -49,11 +49,27 @@ input {
 
 .page {
   max-width: 1600px;
+  min-height: 100dvh;
   margin: 0 auto;
   padding: 14px 32px 20px;
   display: flex;
   flex-direction: column;
   gap: 20px;
+}
+
+/* Printer's colour-control dots at the foot of every page: cyan, magenta, yellow, black. */
+.page::after {
+  content: '';
+  flex: none;
+  align-self: flex-end;
+  margin-top: auto;
+  width: 72px;
+  height: 12px;
+  background:
+    radial-gradient(circle closest-side, #00aeef 92%, transparent) 0 0 / 12px 12px no-repeat,
+    radial-gradient(circle closest-side, #ec008c 92%, transparent) 20px 0 / 12px 12px no-repeat,
+    radial-gradient(circle closest-side, #ffe600 92%, transparent) 40px 0 / 12px 12px no-repeat,
+    radial-gradient(circle closest-side, #141414 92%, transparent) 60px 0 / 12px 12px no-repeat;
 }
 
 .muted {
@@ -62,6 +78,29 @@ input {
 
 .error {
   color: var(--error);
+}
+
+.headline {
+  font-size: clamp(1.7rem, 2.2vw + 1rem, 3.1rem);
+  font-weight: 900;
+  line-height: 1.08;
+  letter-spacing: -0.01em;
+  text-align: center;
+  text-wrap: balance;
+}
+
+.headline + .standfirst {
+  margin-top: -10px;
+}
+
+/* Small plain label above a playful headline, so the topic stays findable. */
+.kicker {
+  display: block;
+  font-size: 0.68rem;
+  font-weight: 400;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
 }
 
 .standfirst {
@@ -108,13 +147,27 @@ input {
 }
 
 .masthead-title {
-  align-self: center;
+  position: relative;
+  display: block;
+  text-align: center;
   font-size: clamp(2rem, 4.2vh + 0.6vw, 3.2rem);
   font-weight: 900;
   line-height: 1.05;
+  /* Matching left padding keeps the spaced-out word centred. */
+  padding-left: 0.12em;
   letter-spacing: 0.12em;
   text-transform: uppercase;
   text-decoration: none;
+}
+
+/* Logo sits at the left edge of the masthead; the name stays centred. */
+.masthead-logo {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  height: 1.15em;
+  width: auto;
+  transform: translateY(-50%);
 }
 
 .dateline {
@@ -215,6 +268,143 @@ input {
   text-transform: uppercase;
 }
 
+/* Front page: puzzles as the lead story, pocket cartoon in the side column */
+
+.front {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(240px, 320px);
+  gap: 32px;
+  align-items: start;
+}
+
+.front-main {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  min-width: 0;
+}
+
+.front-aside {
+  padding-left: 32px;
+  border-left: 1px solid var(--ink);
+}
+
+.pocket-cartoon {
+  margin: 0;
+  padding: 10px 12px 12px;
+  border: 1px solid var(--ink);
+  outline: 1px solid var(--ink);
+  outline-offset: 3px;
+  background: var(--cell);
+}
+
+.pocket-cartoon svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.pocket-cartoon figcaption {
+  margin-top: 6px;
+  padding-top: 8px;
+  border-top: 1px solid var(--ink);
+  font-size: 0.95rem;
+  line-height: 1.3;
+  text-align: center;
+}
+
+.welcome-cartoon {
+  align-self: center;
+  width: min(100%, 320px);
+}
+
+.spot {
+  flex: none;
+  width: 1.7em;
+  height: 1.7em;
+}
+
+/* How-it-works guide: newspaper columns */
+
+.guide {
+  column-count: 3;
+  column-gap: 36px;
+  column-rule: 1px solid var(--rule);
+  text-align: justify;
+  hyphens: auto;
+}
+
+.guide article {
+  break-inside: avoid;
+  margin-bottom: 18px;
+}
+
+.guide h3 {
+  display: flex;
+  align-items: flex-end;
+  line-height: 1.15;
+  gap: 8px;
+  margin: 0 0 4px;
+  padding-bottom: 3px;
+  border-bottom: 1px solid var(--rule);
+  font-size: 1.05rem;
+  font-weight: 700;
+  text-align: left;
+}
+
+/* Drop cap on the opening paragraph, as a lead article has. */
+.guide .lead p::first-letter {
+  float: left;
+  margin: 0.06em 0.08em 0 0;
+  font-size: 3.1em;
+  font-weight: 900;
+  line-height: 0.82;
+}
+
+.guide p {
+  margin-bottom: 6px;
+}
+
+.guide ul {
+  margin: 0 0 6px;
+  padding-left: 1.1em;
+  text-align: left;
+}
+
+.guide li {
+  margin-bottom: 3px;
+}
+
+.guide-fields {
+  font-style: italic;
+  text-align: left;
+}
+
+@media (max-width: 1100px) {
+  .guide {
+    column-count: 2;
+  }
+}
+
+@media (max-width: 700px) {
+  .guide {
+    column-count: 1;
+  }
+}
+
+@media (max-width: 900px) {
+  .front {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .front-aside {
+    padding-left: 0;
+    border-left: 0;
+    justify-self: center;
+    width: min(100%, 340px);
+  }
+}
+
 /* Game: fills the viewport, grid left, clues right, no page scroll */
 
 .game {
@@ -291,6 +481,13 @@ input {
 
 .cell.cursor {
   background: var(--cursor);
+}
+
+.cell.hinted {
+  /* Revealed by a hint: set apart from the player's own letters, and not editable. */
+  font-style: italic;
+  font-weight: 400;
+  color: var(--muted);
 }
 
 .cell.missed {

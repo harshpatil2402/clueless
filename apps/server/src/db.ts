@@ -24,8 +24,11 @@ export interface AttemptRow {
   wrong_submits: number;
   score: number | null;
   gave_up: number;
-  /** JSON rows of the grid as it stood when the player gave up. */
+  /** JSON rows of the grid as it stood when the player submitted or gave up. */
   final_grid: string | null;
+  hints_used: number;
+  /** JSON list of [row, col] cells revealed as hints. */
+  hinted_cells: string | null;
 }
 
 export interface LeaderboardEntry {
@@ -60,6 +63,8 @@ const SCHEMA = `
     score INTEGER,
     gave_up INTEGER NOT NULL DEFAULT 0,
     final_grid TEXT,
+    hints_used INTEGER NOT NULL DEFAULT 0,
+    hinted_cells TEXT,
     UNIQUE (player_id, puzzle_id)
   );
   CREATE INDEX IF NOT EXISTS attempts_by_puzzle ON attempts (puzzle_id, score);
@@ -75,6 +80,8 @@ export class Store {
     const columns = (this.db.prepare('PRAGMA table_info(attempts)').all() as Array<{ name: string }>).map((c) => c.name);
     if (!columns.includes('gave_up')) this.db.exec('ALTER TABLE attempts ADD COLUMN gave_up INTEGER NOT NULL DEFAULT 0');
     if (!columns.includes('final_grid')) this.db.exec('ALTER TABLE attempts ADD COLUMN final_grid TEXT');
+    if (!columns.includes('hints_used')) this.db.exec('ALTER TABLE attempts ADD COLUMN hints_used INTEGER NOT NULL DEFAULT 0');
+    if (!columns.includes('hinted_cells')) this.db.exec('ALTER TABLE attempts ADD COLUMN hinted_cells TEXT');
   }
 
   close(): void {
@@ -121,12 +128,16 @@ export class Store {
     return this.getAttempt(playerId, puzzleId)!;
   }
 
-  recordWrongSubmit(attemptId: number): void {
-    this.db.prepare('UPDATE attempts SET wrong_submits = wrong_submits + 1 WHERE id = ?').run(attemptId);
+  recordHints(attemptId: number, cells: Array<[number, number]>): void {
+    this.db
+      .prepare('UPDATE attempts SET hints_used = ?, hinted_cells = ? WHERE id = ?')
+      .run(cells.length, JSON.stringify(cells), attemptId);
   }
 
-  finishAttempt(attemptId: number, finishedAt: number, score: number): void {
-    this.db.prepare('UPDATE attempts SET finished_at = ?, score = ? WHERE id = ?').run(finishedAt, score, attemptId);
+  finishAttempt(attemptId: number, finishedAt: number, score: number, grid: string[]): void {
+    this.db
+      .prepare('UPDATE attempts SET finished_at = ?, score = ?, final_grid = ? WHERE id = ?')
+      .run(finishedAt, score, JSON.stringify(grid), attemptId);
   }
 
   giveUpAttempt(attemptId: number, finishedAt: number, grid: string[]): void {
@@ -135,7 +146,7 @@ export class Store {
       .run(finishedAt, JSON.stringify(grid), attemptId);
   }
 
-  /** Solved attempts for a puzzle, best first: higher score, then faster time. */
+  /** Submitted attempts for a puzzle, best first: higher score, then faster time. */
   leaderboard(puzzleId: string, limit: number): LeaderboardEntry[] {
     return this.db
       .prepare(

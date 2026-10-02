@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { BLOCK, EMPTY, entryCells, type Direction, type PublicPuzzle } from '@crossword/shared';
+import { BLOCK, EMPTY, entryCells, type Direction, type Hint, type PublicPuzzle } from '@crossword/shared';
 import { loadGrid, saveGrid } from '../storage';
 
 export interface CellInfo {
@@ -26,16 +26,24 @@ function buildCells(puzzle: PublicPuzzle): (CellInfo | null)[][] {
   return cells;
 }
 
-function initialLetters(puzzle: PublicPuzzle, puzzleId: string, solution: string[] | null): string[][] {
+const cellKey = (row: number, col: number) => `${row},${col}`;
+
+function initialLetters(puzzle: PublicPuzzle, puzzleId: string, solution: string[] | null, hints: Hint[]): string[][] {
   if (solution) return solution.map((row) => [...row].map((char) => (char === BLOCK ? '' : char)));
   const saved = loadGrid(puzzleId);
-  if (saved && saved.length === puzzle.rows && saved.every((row) => row.length === puzzle.cols)) return saved;
-  return Array.from({ length: puzzle.rows }, () => Array<string>(puzzle.cols).fill(''));
+  const letters =
+    saved && saved.length === puzzle.rows && saved.every((row) => row.length === puzzle.cols)
+      ? saved
+      : Array.from({ length: puzzle.rows }, () => Array<string>(puzzle.cols).fill(''));
+  for (const hint of hints) letters[hint.row][hint.col] = hint.letter;
+  return letters;
 }
 
-export function useCrossword(puzzle: PublicPuzzle, puzzleId: string, solution: string[] | null) {
+export function useCrossword(puzzle: PublicPuzzle, puzzleId: string, solution: string[] | null, hints: Hint[]) {
   const cells = useMemo(() => buildCells(puzzle), [puzzle]);
-  const [letters, setLetters] = useState(() => initialLetters(puzzle, puzzleId, solution));
+  const [letters, setLetters] = useState(() => initialLetters(puzzle, puzzleId, solution, hints));
+  /** Cells revealed as hints: shown, but no longer editable. */
+  const [locked, setLocked] = useState(() => new Set(hints.map((hint) => cellKey(hint.row, hint.col))));
   const [cursor, setCursor] = useState<Cursor>({ row: puzzle.entries[0].row, col: puzzle.entries[0].col });
   const [direction, setDirection] = useState<Direction>(puzzle.entries[0].direction);
   const [readOnly, setReadOnly] = useState(solution !== null);
@@ -85,7 +93,7 @@ export function useCrossword(puzzle: PublicPuzzle, puzzleId: string, solution: s
 
   const typeLetter = (letter: string) => {
     if (readOnly) return;
-    setLetter(cursor.row, cursor.col, letter.toUpperCase());
+    if (!locked.has(cellKey(cursor.row, cursor.col))) setLetter(cursor.row, cursor.col, letter.toUpperCase());
     const position = activeCells.findIndex(([r, c]) => r === cursor.row && c === cursor.col);
     const next = activeCells[position + 1];
     if (next) setCursor({ row: next[0], col: next[1] });
@@ -93,14 +101,14 @@ export function useCrossword(puzzle: PublicPuzzle, puzzleId: string, solution: s
 
   const backspace = () => {
     if (readOnly) return;
-    if (letters[cursor.row][cursor.col] !== '') {
+    if (letters[cursor.row][cursor.col] !== '' && !locked.has(cellKey(cursor.row, cursor.col))) {
       setLetter(cursor.row, cursor.col, '');
       return;
     }
     const position = activeCells.findIndex(([r, c]) => r === cursor.row && c === cursor.col);
     const previous = activeCells[position - 1];
     if (previous) {
-      setLetter(previous[0], previous[1], '');
+      if (!locked.has(cellKey(previous[0], previous[1]))) setLetter(previous[0], previous[1], '');
       setCursor({ row: previous[0], col: previous[1] });
     }
   };
@@ -132,6 +140,16 @@ export function useCrossword(puzzle: PublicPuzzle, puzzleId: string, solution: s
   const toGrid = () =>
     cells.map((row, r) => row.map((info, c) => (info === null ? BLOCK : letters[r][c] || EMPTY)).join(''));
 
+  const reveal = (hint: Hint) => {
+    setLetter(hint.row, hint.col, hint.letter);
+    setLocked((previous) => new Set(previous).add(cellKey(hint.row, hint.col)));
+  };
+
+  const emptyCount = cells.reduce(
+    (total, row, r) => total + row.filter((info, c) => info !== null && letters[r][c] === '').length,
+    0,
+  );
+
   const showSolution = (solved: string[]) => {
     setLetters(solved.map((row) => [...row].map((char) => (char === BLOCK ? '' : char))));
     setReadOnly(true);
@@ -146,7 +164,10 @@ export function useCrossword(puzzle: PublicPuzzle, puzzleId: string, solution: s
     activeEntry,
     activeCells,
     isFull,
+    emptyCount,
+    locked,
     readOnly,
+    reveal,
     selectCell,
     selectEntry,
     toggleDirection,

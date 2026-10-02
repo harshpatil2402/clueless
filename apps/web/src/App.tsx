@@ -1,6 +1,8 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { DIFFICULTIES, type PlayerSession } from '@crossword/shared';
 import { api } from './api';
+import { PocketCartoon } from './components/Cartoons';
+import { Guide } from './components/Guide';
 import { Masthead } from './components/Masthead';
 import { Game, type GameTarget } from './pages/Game';
 import { Home } from './pages/Home';
@@ -52,7 +54,8 @@ function Welcome({ onJoined }: { onJoined: (player: PlayerSession) => void }) {
   return (
     <main className="page">
       <Masthead left="Welcome" />
-      <p className="standfirst">Quiz knowledge in crossword form. Pick a nickname for the leaderboard.</p>
+      <h1 className="headline">Extra! Extra! Brains Wanted</h1>
+      <p className="standfirst">Quiz knowledge in crossword form. Pick a nickname for the leaderboard and step up.</p>
       <form className="welcome-form" onSubmit={join}>
         <input
           autoFocus
@@ -67,6 +70,10 @@ function Welcome({ onJoined }: { onJoined: (player: PlayerSession) => void }) {
         </button>
       </form>
       {error && <p className="error">{error}</p>}
+      <div className="welcome-cartoon">
+        <PocketCartoon />
+      </div>
+      <Guide />
     </main>
   );
 }

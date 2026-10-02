@@ -25,6 +25,8 @@ export function Leaderboard() {
     <main className="page">
       <Masthead date={board?.date} left={<a href="#/">← Front page</a>} right="Leaderboard" />
 
+      <h1 className="headline">Hall of Fame: Today's Sharpest Pencils</h1>
+
       <div className="tabs" role="tablist">
         {DIFFICULTIES.map((level) => (
           <button
@@ -41,7 +43,7 @@ export function Leaderboard() {
       </div>
 
       {error && <p className="error">{error}</p>}
-      {board && board.rows.length === 0 && <p className="muted">Nobody solved this one yet today.</p>}
+      {board && board.rows.length === 0 && <p className="muted">Nobody has cracked this grid yet today. The top spot is yours for the taking.</p>}
       {board && board.rows.length > 0 && (
         <table className="leaderboard">
           <thead>
